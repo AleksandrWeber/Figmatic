@@ -16,7 +16,9 @@ function getToken(): string {
 }
 
 // 📁 Cache settings
-const CACHE_DIR = path.resolve("cache");
+// 📁 Cache settings - Use absolute path relative to this file
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const CACHE_DIR = path.join(__dirname, "../../../cache");
 
 // ⏳ helper
 const sleep = (ms: number) =>
@@ -34,7 +36,7 @@ export async function getFigmaFile(fileKey: string) {
 
   const url = `${FIGMA_API_BASE_URL}/files/${fileKey}`;
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= 5; attempt++) {
     console.log(`👉 Fetching Figma file from API (attempt ${attempt})`);
 
     const headers = new Headers();
@@ -45,8 +47,9 @@ export async function getFigmaFile(fileKey: string) {
     console.log("👉 Status:", response.status);
 
     if (response.status === 429) {
-      console.log("⏳ Rate limited, waiting 3 seconds...");
-      await sleep(3000);
+      const waitTime = Math.pow(2, attempt) * 2000; // Exponential backoff: 4s, 8s, 16s...
+      console.log(`⏳ Rate limited, waiting ${waitTime / 1000} seconds...`);
+      await sleep(waitTime);
       continue;
     }
 
