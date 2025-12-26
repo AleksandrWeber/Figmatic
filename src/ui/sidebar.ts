@@ -33,14 +33,17 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (data: any) => {
       switch (data.type) {
         case 'generate': {
-          await this._handleGenerate(data.fileKey, data.instructions);
+          await this._handleGenerate(data.fileKey, data.instructions, data.figmaToken, data.geminiToken);
           break;
         }
       }
     });
   }
 
-  private async _handleGenerate(fileKey: string, instructions?: string) {
+  private async _handleGenerate(fileKey: string, instructions?: string, figmaToken?: string, geminiToken?: string) {
+    // If tokens are provided manually in the UI, set them in process.env
+    if (figmaToken) process.env.FIGMA_TOKEN = figmaToken;
+    if (geminiToken) process.env.GEMINI_API_KEY = geminiToken;
     if (!fileKey) {
       vscode.window.showErrorMessage('❌ Please provide a Figma File Key');
       return;
@@ -127,10 +130,22 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
             <label>Figma File Key</label>
             <input type="text" id="fileKey" placeholder="e.g. U3LB45bgtgmp9HI5..." value="U3LB45bgtgmp9HI54EnvTR">
           </div>
+
+          <div class="field">
+            <label>Figma API Token (Optional if .env exists)</label>
+            <input type="password" id="figmaToken" placeholder="Paste your Figma token here...">
+          </div>
+
+          <div class="field">
+            <label>Gemini API Key (Optional if .env exists)</label>
+            <input type="password" id="geminiToken" placeholder="Paste your Gemini key here...">
+          </div>
+
           <div class="field">
             <label>Refinement Instructions (Optional)</label>
-            <textarea id="instructions" rows="4" placeholder="e.g. Make the header red and add a shadow..."></textarea>
+            <textarea id="instructions" rows="3" placeholder="e.g. Make the header red..."></textarea>
           </div>
+          
           <button id="generateBtn">🚀 Generate Architect Plan</button>
         </div>
 
@@ -139,11 +154,17 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
           const generateBtn = document.getElementById('generateBtn');
           const fileKeyInput = document.getElementById('fileKey');
           const instructionsInput = document.getElementById('instructions');
+          const figmaTokenInput = document.getElementById('figmaToken');
+          const geminiTokenInput = document.getElementById('geminiToken');
 
           generateBtn.addEventListener('click', () => {
-            const fileKey = fileKeyInput.value;
-            const instructions = instructionsInput.value;
-            vscode.postMessage({ type: 'generate', fileKey, instructions });
+            vscode.postMessage({ 
+              type: 'generate', 
+              fileKey: fileKeyInput.value, 
+              instructions: instructionsInput.value,
+              figmaToken: figmaTokenInput.value,
+              geminiToken: geminiTokenInput.value
+            });
           });
         </script>
       </body>
