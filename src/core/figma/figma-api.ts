@@ -24,6 +24,9 @@ const CACHE_DIR = path.resolve(process.env.FIGMATIC_CACHE_DIR || path.join(proce
 // ⏳ helper
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// 📉 Throttling settings
+const THROTTLE_DELAY = 1000; // 1 second pause between successful requests to avoid spamming
+
 // ⏳ Centralized Fetch with Retry
 async function fetchWithRetry(url: string, options: any = {}, maxRetries: number = 7): Promise<any> {
   const headers = {
@@ -36,7 +39,7 @@ async function fetchWithRetry(url: string, options: any = {}, maxRetries: number
       const response = await fetch(url, { ...options, headers });
 
       if (response.status === 429) {
-        const waitTime = Math.pow(2, attempt) * 2000;
+        const waitTime = Math.pow(2, attempt) * 3000; // Increased backoff base to 3s
         console.log(`⏳ Rate limited (429), waiting ${waitTime / 1000}s (attempt ${attempt}/${maxRetries})...`);
         await sleep(waitTime);
         continue;
@@ -48,6 +51,9 @@ async function fetchWithRetry(url: string, options: any = {}, maxRetries: number
         if (response.status === 404) throw new Error("❌ File Not Found.");
         throw new Error(`❌ Figma API error: ${response.status}`);
       }
+
+      // Mandatory throttle pause after a successful request
+      await sleep(THROTTLE_DELAY);
 
       return response;
     } catch (err: any) {
