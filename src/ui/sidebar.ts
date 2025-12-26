@@ -72,8 +72,17 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
         const artifacts = await agent.processFullPage(firstFrame, fileKey, {}, instructions);
 
         progress.report({ message: "Writing files to workspace..." });
+
+        // Create project subfolder
+        const projectName = data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'figmatic_project';
+        const projectDir = path.join(outputDir, projectName);
+
+        if (!fs.existsSync(projectDir)) {
+          fs.mkdirSync(projectDir, { recursive: true });
+        }
+
         for (const art of artifacts) {
-          const filePath = path.join(outputDir, art.path);
+          const filePath = path.join(projectDir, art.path);
           const parentDir = path.dirname(filePath);
           if (!fs.existsSync(parentDir)) {
             fs.mkdirSync(parentDir, { recursive: true });
@@ -81,7 +90,7 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
           fs.writeFileSync(filePath, art.content, 'utf-8');
         }
 
-        vscode.window.showInformationMessage(`✅ Figmatic: Generated ${artifacts.length} artifacts!`);
+        vscode.window.showInformationMessage(`✅ Figmatic: Generated ${artifacts.length} artifacts in folder "${projectName}"!`);
       } catch (err: any) {
         vscode.window.showErrorMessage(`💥 Figmatic Error: ${err.message}`);
       }
