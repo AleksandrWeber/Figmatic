@@ -1,8 +1,50 @@
 {
   "name": "figmatic",
+  "displayName": "Figmatic",
+  "description": "AI-powered Senior Frontend Architect that transforms Figma designs into production-ready React + SCSS code.",
   "version": "1.0.0",
+  "publisher": "OleksandrShvachko",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
   "type": "module",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "figmatic-explorer",
+          "title": "Figmatic",
+          "icon": "assets/logo.png"
+        }
+      ]
+    },
+    "views": {
+      "figmatic-explorer": [
+        {
+          "type": "webview",
+          "id": "figmatic.sidebar",
+          "name": "Figmatic Architect",
+          "icon": "assets/logo.png"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "figmatic.generate",
+        "title": "Figmatic: Generate Code"
+      }
+    ]
+  },
   "scripts": {
+    "vscode:prepublish": "npm run bundle",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "bundle": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "dev": "node --loader ts-node/esm src/index.ts"
   },
   "dependencies": {
@@ -16,6 +58,8 @@
     "@types/node": "^25.0.3",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
+    "@types/vscode": "^1.80.0",
+    "esbuild": "^0.27.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

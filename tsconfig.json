@@ -5,8 +5,8 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "esModuleInterop": true,
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
+    "noEmit": false,
+    "outDir": "dist",
     "skipLibCheck": true,
     "jsx": "react-jsx",
     "lib": [
