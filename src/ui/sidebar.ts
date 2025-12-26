@@ -15,6 +15,7 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
     context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ) {
+    console.log('🔍 Figmatic: Resolving Sidebar Webview...');
     this._view = webviewView;
 
     webviewView.webview.options = {
@@ -22,7 +23,12 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri]
     };
 
-    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+    try {
+      webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+      console.log('✅ Figmatic: Webview HTML set.');
+    } catch (err) {
+      console.error('❌ Figmatic: Failed to set webview HTML:', err);
+    }
 
     webviewView.webview.onDidReceiveMessage(async (data: any) => {
       switch (data.type) {

@@ -6,15 +6,14 @@ import * as path from "path";
 // 🌐 Base API URL
 const FIGMA_API_BASE_URL = "https://api.figma.com/v1";
 
-// 🔑 Token (initial)
-const FIGMA_TOKEN = process.env.FIGMA_TOKEN || process.env.X_Figma_Token;
-
-if (!FIGMA_TOKEN) {
-  throw new Error("❌ FIGMA_TOKEN not found in .env file");
+// 🔑 Token Helper
+function getToken(): string {
+  const token = process.env.FIGMA_TOKEN || process.env.X_Figma_Token;
+  if (!token) {
+    throw new Error("❌ FIGMA_TOKEN not found. Please ensure you have a .env file with FIGMA_TOKEN in your workspace root, or set it in your environment variables.");
+  }
+  return token;
 }
-
-// ✅ Narrow type AFTER check
-const TOKEN: string = FIGMA_TOKEN;
 
 // 📁 Cache settings
 const CACHE_DIR = path.resolve("cache");
@@ -39,7 +38,7 @@ export async function getFigmaFile(fileKey: string) {
     console.log(`👉 Fetching Figma file from API (attempt ${attempt})`);
 
     const headers = new Headers();
-    headers.set("X-Figma-Token", TOKEN);
+    headers.set("X-Figma-Token", getToken());
 
     const response = await fetch(url, { headers });
 
@@ -79,7 +78,7 @@ export async function getFigmaImages(fileKey: string, ids: string[], format: str
   console.log(`👉 Fetching Image URLs from Figma (format: ${format})`);
 
   const headers = new Headers();
-  headers.set("X-Figma-Token", TOKEN);
+  headers.set("X-Figma-Token", getToken());
 
   const response = await fetch(url, { headers });
   if (!response.ok) {
