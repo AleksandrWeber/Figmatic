@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "strict": true,
     "esModuleInterop": true,
-    "noEmit": false,
-    "outDir": "dist",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
     "lib": [
