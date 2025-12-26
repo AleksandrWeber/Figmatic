@@ -16,9 +16,8 @@ function getToken(): string {
 }
 
 // 📁 Cache settings
-// 📁 Cache settings - Use absolute path relative to this file
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
-const CACHE_DIR = path.join(__dirname, "../../../cache");
+// 📁 Cache settings - Use absolute path relative to the process or extension
+const CACHE_DIR = path.resolve(process.env.FIGMATIC_CACHE_DIR || path.join(process.cwd(), "cache"));
 
 // ⏳ helper
 const sleep = (ms: number) =>
@@ -36,7 +35,7 @@ export async function getFigmaFile(fileKey: string) {
 
   const url = `${FIGMA_API_BASE_URL}/files/${fileKey}`;
 
-  for (let attempt = 1; attempt <= 5; attempt++) {
+  for (let attempt = 1; attempt <= 7; attempt++) {
     console.log(`👉 Fetching Figma file from API (attempt ${attempt})`);
 
     const headers = new Headers();
