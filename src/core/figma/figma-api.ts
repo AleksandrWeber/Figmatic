@@ -53,6 +53,15 @@ export async function getFigmaFile(fileKey: string) {
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error(`❌ Invalid Figma Token. Please check your FIGMA_TOKEN.`);
+      }
+      if (response.status === 403) {
+        throw new Error(`❌ Figma Access Denied. Your token doesn't have permissions for this file or the file key is incorrect.`);
+      }
+      if (response.status === 404) {
+        throw new Error(`❌ Figma File Not Found. Please check your Figma File Key.`);
+      }
       throw new Error(`❌ Figma API error: ${response.status}`);
     }
 
