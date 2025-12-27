@@ -4,6 +4,7 @@
   "description": "AI-powered Senior Frontend Architect that transforms Figma designs into production-ready React + SCSS code.",
   "version": "1.0.0",
   "publisher": "OleksandrShvachko",
+  "icon": "assets/logo.png",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -28,10 +29,20 @@
         {
           "type": "webview",
           "id": "figmatic.sidebar",
-          "name": "Figmatic Architect",
-          "icon": "assets/logo.png"
+          "name": "Figmatic"
         }
       ]
+    },
+    "configuration": {
+      "title": "Figmatic",
+      "properties": {
+        "figmatic.geminiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your Google Gemini API Key. If set, this will be used instead of the .env file or manual entry.",
+          "scope": "application"
+        }
+      }
     },
     "commands": [
       {

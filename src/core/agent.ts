@@ -17,18 +17,21 @@ export class Agent {
     this.planner = new CodePlanner(this.aiService);
   }
 
-  async processFullPage(rootNode: any, fileKey: string, constraints: any = {}, userInstructions?: string) {
+  async processFullPage(rootNode: any, fileKey: string, projectDir: string, constraints: any = {}, userInstructions?: string, onProgress?: (msg: string) => void) {
+    onProgress?.(`🤖 Agent: Processing full page design "${rootNode.name}" in folder "${path.basename(projectDir)}"...`);
     console.log(`🤖 Agent: Processing full page design "${rootNode.name}"...`);
 
     // 1. Parse Full Page to DSL
     const fullDsl = figmaToDSL(rootNode);
 
-    // 2. Asset Management
-    await this.handleAssets(fullDsl, fileKey);
-
     // 3. Extract Global Tokens
+    onProgress?.("💎 Extracting Global Design Tokens...");
     const tokens = extractTokens(fullDsl);
     const tokenScss = generateTokenScss(tokens);
+
+    // 2. Asset Management
+    onProgress?.("🖼️ Handling images and icons...");
+    await this.handleAssets(fullDsl, fileKey, projectDir, onProgress);
 
     // 4. Process each section ...
     const sections = fullDsl.children || [];
@@ -45,7 +48,9 @@ export class Agent {
       }
     ];
 
-    for (const section of sections) {
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i];
+      onProgress?.(`🛠️ Orchestrating section ${i + 1}/${sections.length}: ${section.name}...`);
       const { artifacts: sectionArts, componentName } = await this.processSection(section, tokens, constraints, userInstructions);
       artifacts.push(...sectionArts);
       sectionMetadata.push({ name: componentName, fileName: componentName });
@@ -60,7 +65,7 @@ export class Agent {
     return artifacts;
   }
 
-  private async handleAssets(dsl: DSLNode, fileKey: string) {
+  private async handleAssets(dsl: DSLNode, fileKey: string, projectDir: string, onProgress?: (msg: string) => void) {
     const imageIds: string[] = [];
     const vectorIds: string[] = [];
 
@@ -78,7 +83,8 @@ export class Agent {
         if (url) {
           const node = this.findNodeByFigmaId(dsl, id);
           if (node) {
-            const dest = path.resolve(`output/assets/${node.className}.png`);
+            onProgress?.(`⬇️ Downloading image: ${node.className}.png`);
+            const dest = path.join(projectDir, "assets", `${node.className}.png`);
             await downloadAsset(url, dest);
           }
         }
@@ -92,7 +98,8 @@ export class Agent {
         if (url) {
           const node = this.findNodeByFigmaId(dsl, id);
           if (node) {
-            const dest = path.resolve(`output/assets/icons/${node.className}.svg`);
+            onProgress?.(`⬇️ Downloading icon: ${node.className}.svg`);
+            const dest = path.join(projectDir, "assets", "icons", `${node.className}.svg`);
             await downloadAsset(url, dest);
           }
         }
@@ -155,5 +162,20 @@ export class Agent {
       scssCode,
       tokens
     };
+  }
+
+  async getPostGenerationSuggestions(projectName: string): Promise<string[]> {
+    const prompt = `Project "${projectName}" generation is complete. 
+    As a Senior Architect, provide 3-4 professional suggestions for the next steps or improvements. 
+    Focus on performance, accessibility (A11y), and interactive features.
+    Keep suggestions concise and technical.
+    Return as a JSON array of strings.`;
+
+    try {
+      const response = await this.aiService.generateJSON(prompt);
+      return Array.isArray(response) ? response : ["Add responsive breakpoints", "Optimize images", "Add ARIA labels"];
+    } catch {
+      return ["Add responsive breakpoints", "Optimize images", "Add ARIA labels"];
+    }
   }
 }

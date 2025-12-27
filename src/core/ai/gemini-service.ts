@@ -8,10 +8,11 @@ export class GeminiService {
   private model: any;
 
   constructor(systemInstructions: string = "", tools: any[] = []) {
-    if (!API_KEY) {
-      throw new Error("❌ GEMINI_API_KEY not found in .env file");
+    const activeKey = process.env.GEMINI_API_KEY || API_KEY;
+    if (!activeKey) {
+      throw new Error("❌ GEMINI_API_KEY not found. Please set it in .env or VS Code settings.");
     }
-    this.genAI = new GoogleGenerativeAI(API_KEY);
+    this.genAI = new GoogleGenerativeAI(activeKey);
 
     this.model = this.genAI.getGenerativeModel({
       model: "gemini-flash-latest",
@@ -97,6 +98,19 @@ export class GeminiService {
     } catch (error) {
       console.error("❌ Gemini Error:", error);
       return { recommendations: [], summary: "Failed to analyze design" };
+    }
+  }
+
+  async generateJSON(prompt: string): Promise<any> {
+    try {
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      const jsonText = text.replace(/```json|```/g, "").trim();
+      return JSON.parse(jsonText);
+    } catch (error) {
+      console.error("❌ Gemini JSON Error:", error);
+      throw error;
     }
   }
 }
