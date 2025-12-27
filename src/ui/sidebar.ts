@@ -14,6 +14,7 @@ function extractFileKey(input: string): string {
 export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'figmatic.sidebar';
   private _view?: vscode.WebviewView;
+  private _activeAgent?: Agent;
 
   constructor(private readonly _extensionUri: vscode.Uri) { }
 
@@ -52,6 +53,12 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
           });
           if (uri && uri[0]) {
             webviewView.webview.postMessage({ type: 'folderPicked', path: uri[0].fsPath });
+          }
+          break;
+        }
+        case 'fontResolution': {
+          if (this._activeAgent) {
+            this._activeAgent.resolveFontDecision(data.decision);
           }
           break;
         }
@@ -110,9 +117,10 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
         const firstFrame = data.document.children[0].children[0];
         const config = vscode.workspace.getConfiguration('figmatic');
         const styleFramework = config.get<string>('styleFramework') || 'scss';
+        const generateStorybook = config.get<boolean>('generateStorybook') || false;
 
-        const agent = new Agent();
-        const artifacts = await agent.processFullPage(firstFrame, fileKey, projectDir, { styleFramework }, instructions, (msg) => {
+        this._activeAgent = new Agent();
+        const artifacts = await this._activeAgent.processFullPage(firstFrame, fileKey, projectDir, { styleFramework, generateStorybook }, instructions, (msg) => {
           this._view?.webview.postMessage({ type: 'status', message: msg });
         });
 
@@ -128,9 +136,27 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
           fs.writeFileSync(filePath, art.content, 'utf-8');
         }
 
-        const suggestions = await agent.getPostGenerationSuggestions(projectName);
+        // --- NEW: Refinement - Git Initializer ---
+        try {
+          const { execSync } = require('child_process');
+          execSync('git init', { cwd: projectDir, stdio: 'ignore' });
+          this._view?.webview.postMessage({ type: 'status', message: '🚀 Git repository initialized' });
+        } catch (gitErr) {
+          console.warn("Git initialization failed:", gitErr);
+        }
+        // ----------------------------------------
+
+        const suggestions = await this._activeAgent.getPostGenerationSuggestions(projectName);
         this._view?.webview.postMessage({ type: 'completed', projectName, suggestions });
-        vscode.window.showInformationMessage(`✅ Figmatic: Generated ${artifacts.length} artifacts in folder "${projectName}"!`);
+
+        const openAction = "Open Folder";
+        vscode.window.showInformationMessage(`✅ Figmatic: Generated ${artifacts.length} artifacts in "${projectName}"!`, openAction)
+          .then(selection => {
+            if (selection === openAction) {
+              const uri = vscode.Uri.file(projectDir);
+              vscode.commands.executeCommand('vscode.openFolder', uri, true);
+            }
+          });
       } catch (err: any) {
         this._view?.webview.postMessage({ type: 'error', message: err.message });
         vscode.window.showErrorMessage(`💥 Figmatic Error: ${err.message}`);
@@ -166,60 +192,59 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
             font-weight: bold;
           }
           button:hover { background: var(--vscode-button-hoverBackground); }
+          button:disabled { opacity: 0.5; cursor: not-allowed; }
           h2 { font-size: 1.2rem; margin-bottom: 20px; text-align: center; color: var(--vscode-button-background); }
           .logo { text-align: center; margin-bottom: 10px; }
-          .logo img { width: 64px; }
+          .logo h1 { color: var(--vscode-button-background); margin: 0; }
+          
+          #progressContainer { display: none; margin-top: 15px; background: #1e1e1e; padding: 10px; border-radius: 4px; border: 1px solid #333; }
+          #timer { color: #61afef; font-family: monospace; font-size: 1.1rem; margin-bottom: 5px; font-weight: bold; }
+          #log { color: #abb2bf; font-family: monospace; font-size: 0.85rem; max-height: 200px; overflow-y: auto; }
+          
+          .font-dialog { margin-top: 10px; background: #2c313a; padding: 10px; border-radius: 4px; border-left: 4px solid #e06c75; }
+          .font-dialog h3 { color: #e06c75; margin-top: 0; font-size: 0.9rem; }
+          .font-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.8rem; }
+          .font-table th, .font-table td { text-align: left; padding: 4px; border-bottom: 1px solid #3e4451; }
+          .font-actions { display: flex; gap: 5px; margin-top: 10px; }
+          .btn-small { padding: 5px 10px; font-size: 0.75rem; }
+          .btn-secondary { background: #4b5263; }
         </style>
       </head>
       <body>
-        <div class="logo">
-           <h1>Figmatic</h1>
-        </div>
+        <div class="logo"><h1>Figmatic</h1></div>
         <div class="container">
           <div class="field">
             <label>Figma URL or File Key</label>
             <input type="text" id="fileKey" placeholder="Paste Figma URL here..." value="U3LB45bgtgmp9HI54EnvTR">
           </div>
-
           <div class="field">
-            <label>Output Directory (Optional)</label>
+            <label>Output Directory</label>
             <div style="display: flex; gap: 5px;">
               <input type="text" id="outputDir" placeholder="Current workspace" readonly>
               <button id="pickFolderBtn" style="padding: 5px;">📁</button>
             </div>
           </div>
-
           <div class="field">
-            <label>Figma API Token (Optional if .env exists)</label>
-            <input type="password" id="figmaToken" placeholder="Paste your Figma token here...">
+            <label>Instructions (Optional)</label>
+            <textarea id="instructions" rows="2" placeholder="e.g. Make it dark theme..."></textarea>
           </div>
-
-          <div class="field">
-            <label>Gemini API Key (Optional if settings/.env exist)</label>
-            <input type="password" id="geminiToken" placeholder="Overridden by VS Code settings...">
-          </div>
-
-          <div class="field">
-            <label>Refinement Instructions (Optional)</label>
-            <textarea id="instructions" rows="3" placeholder="e.g. Make the header red..."></textarea>
-          </div>
-          
           <button id="generateBtn">🚀 Generate Architect Plan</button>
-
-          <div id="progressContainer" style="display: none; margin-top: 15px; background: #1e1e1e; padding: 10px; border-radius: 4px; border: 1px solid #333;">
-            <div id="timer" style="color: #61afef; font-family: monospace; font-size: 1.1rem; margin-bottom: 5px; font-weight: bold;">
-              Estimated: <span id="timeValue">02:00</span>
-            </div>
-            <div id="log" style="color: #abb2bf; font-family: monospace; font-size: 0.85rem; height: 100px; overflow-y: auto;">
-              > Waiting for architecture plan...
-            </div>
+          <div id="progressContainer">
+            <div id="timer">Estimated: <span id="timeValue">02:00</span></div>
+            <div id="log">> Initializing Agent...</div>
           </div>
+          <div id="activeDialogue"></div>
         </div>
 
         <script>
           const vscode = acquireVsCodeApi();
           const generateBtn = document.getElementById('generateBtn');
+          const fileKeyInput = document.getElementById('fileKey');
+          const instructionsInput = document.getElementById('instructions');
+          const outputDirInput = document.getElementById('outputDir');
+          const pickFolderBtn = document.getElementById('pickFolderBtn');
           const progressContainer = document.getElementById('progressContainer');
+          const activeDialogue = document.getElementById('activeDialogue');
           const log = document.getElementById('log');
           const timeValue = document.getElementById('timeValue');
           
@@ -229,65 +254,83 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
           function updateTimer() {
             const m = Math.floor(secondsLeft / 60);
             const s = secondsLeft % 60;
-            const mm = String(m).padStart(2, '0');
-            const ss = String(s).padStart(2, '0');
-            timeValue.textContent = mm + ':' + ss;
+            timeValue.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
             if (secondsLeft > 0) secondsLeft--;
           }
 
-          function startTimer() {
-            secondsLeft = 120;
-            updateTimer();
-            timerInterval = setInterval(updateTimer, 1000);
-          }
+          function startTimer() { secondsLeft = 120; updateTimer(); timerInterval = setInterval(updateTimer, 1000); }
+          function stopTimer() { clearInterval(timerInterval); }
 
-          function stopTimer() {
-            clearInterval(timerInterval);
-          }
-
-          pickFolderBtn.addEventListener('click', () => {
-            vscode.postMessage({ type: 'pickFolder' });
-          });
+          pickFolderBtn.addEventListener('click', () => vscode.postMessage({ type: 'pickFolder' }));
 
           window.addEventListener('message', event => {
             const message = event.data;
             if (message.type === 'folderPicked') {
               outputDirInput.value = message.path;
             } else if (message.type === 'status') {
-              const div = document.createElement('div');
-              div.textContent = \`> \${message.message}\`;
-              log.appendChild(div);
-              log.scrollTop = log.scrollHeight;
+              if (message.message.startsWith('⚠️ detected_commercial_fonts:')) {
+                const fonts = JSON.parse(message.message.split(':')[1]);
+                renderFontDialogue(fonts);
+              } else {
+                const div = document.createElement('div');
+                div.textContent = '> ' + message.message;
+                log.appendChild(div);
+                log.scrollTop = log.scrollHeight;
+              }
             } else if (message.type === 'completed') {
               stopTimer();
               const div = document.createElement('div');
               div.style.color = '#98c379';
-              div.textContent = \`✅ DONE! Find files in "\${message.projectName}"\`;
+              div.style.marginTop = '10px';
+              div.textContent = '✅ DONE! Project created.';
               log.appendChild(div);
-              log.scrollTop = log.scrollHeight;
               generateBtn.disabled = false;
             } else if (message.type === 'error') {
               stopTimer();
               const div = document.createElement('div');
               div.style.color = '#e06c75';
-              div.textContent = \`❌ \${message.message}\`;
+              div.textContent = '❌ ' + message.message;
               log.appendChild(div);
               generateBtn.disabled = false;
             }
           });
 
+          function renderFontDialogue(fonts) {
+            let html = '<div class="font-dialog"><h3>⚠️ Commercial Fonts</h3>';
+            html += '<p style="font-size:0.75rem;margin:5px 0;">Licensing detected. Replace with Google Fonts?</p>';
+            html += '<table class="font-table"><tr><th>Figma</th><th>Google Font</th></tr>';
+            fonts.forEach(f => {
+              html += '<tr><td>' + f.family + '</td><td>' + f.suggestion + '</td></tr>';
+            });
+            html += '</table><div class="font-actions">';
+            html += '<button class="btn-small" id="replaceFontsBtn">Replace All</button>';
+            html += '<button class="btn-small btn-secondary" id="keepFontsBtn">Keep All</button>';
+            html += '</div></div>';
+            activeDialogue.innerHTML = html;
+
+            document.getElementById('replaceFontsBtn').onclick = () => {
+              const decision = {};
+              fonts.forEach(f => decision[f.family] = f.suggestion);
+              submitDecision(decision);
+            };
+            document.getElementById('keepFontsBtn').onclick = () => submitDecision({});
+          }
+
+          function submitDecision(decision) {
+            activeDialogue.innerHTML = '';
+            vscode.postMessage({ type: 'fontResolution', decision });
+          }
+
           generateBtn.addEventListener('click', () => {
             generateBtn.disabled = true;
             progressContainer.style.display = 'block';
-            log.innerHTML = '<div>> Initializing Agent...</div>';
+            activeDialogue.innerHTML = '';
+            log.innerHTML = '<div>> Analyzing Figma Design...</div>';
             startTimer();
-            
             vscode.postMessage({ 
               type: 'generate', 
               fileKey: fileKeyInput.value, 
               instructions: instructionsInput.value,
-              figmaToken: figmaTokenInput.value,
-              geminiToken: geminiTokenInput.value,
               outputDir: outputDirInput.value
             });
           });

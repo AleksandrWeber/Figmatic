@@ -29,7 +29,8 @@
         {
           "type": "webview",
           "id": "figmatic.sidebar",
-          "name": "Figmatic"
+          "name": "Figmatic",
+          "icon": "assets/logo.png"
         }
       ]
     },
@@ -50,6 +51,12 @@
           "type": "string",
           "default": "",
           "description": "Your Google Gemini API Key. If set, this will be used instead of the .env file or manual entry.",
+          "scope": "application"
+        },
+        "figmatic.generateStorybook": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically generate Storybook configuration and stories for each component.",
           "scope": "application"
         }
       }

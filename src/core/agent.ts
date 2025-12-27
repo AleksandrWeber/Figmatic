@@ -3,6 +3,8 @@ import { GeminiService } from "./ai/gemini-service.ts";
 import { CodePlanner, ArchitecturePlan } from "./ai/code-planner.ts";
 import { generateReactComponent, generateRootComponent } from "./generators/react-generator.ts";
 import { generateScss } from "./generators/scss-generator.ts";
+import { generateStory } from "./generators/storybook-generator.ts";
+import { generateTest } from "./generators/test-generator.ts";
 import { extractTokens, DesignTokens, generateTokenScss } from "./parsers/token-parser.ts";
 import { getFigmaImages, downloadAsset } from "./figma/figma-api.ts";
 import * as path from "path";
@@ -11,6 +13,7 @@ import * as fs from "fs";
 export class Agent {
   private aiService: GeminiService;
   private planner: CodePlanner;
+  private fontDecisionResolver: ((decision: any) => void) | null = null;
 
   constructor() {
     this.aiService = new GeminiService("You are Figmatic - an expert Frontend Architect AI Agent.");
@@ -30,6 +33,28 @@ export class Agent {
     onProgress?.("💎 Extracting Global Design Tokens...");
     const tokens = extractTokens(fullDsl);
     const tokenScss = generateTokenScss(tokens);
+
+    // 1.5 Font Analysis & User Dialogue
+    onProgress?.("🔍 Analyzing typography and licenses...");
+    const usedFonts = this.detectFonts(fullDsl);
+    const fontAnalysis = await this.analyzeFonts(usedFonts);
+    const commercialFonts = fontAnalysis.filter(f => f.isCommercial);
+
+    if (commercialFonts.length > 0) {
+      onProgress?.(`⚠️ detected_commercial_fonts:${JSON.stringify(commercialFonts)}`);
+
+      const decision: any = await new Promise((resolve) => {
+        this.fontDecisionResolver = resolve;
+      });
+
+      onProgress?.("✅ Font decision received. Continuing...");
+
+      // If user provided replacements, update the DSL or planning constraints
+      if (decision && typeof decision === 'object' && Object.keys(decision).length > 0) {
+        constraints.fontReplacements = decision;
+        this.applyFontReplacements(fullDsl, decision);
+      }
+    }
 
     // 2. Asset Management
     onProgress?.("🖼️ Handling images and icons...");
@@ -74,13 +99,13 @@ export class Agent {
 
     // 6. Project Bootstrapping (Config Files)
     onProgress?.("📦 Bootstrapping project environment...");
-    const configArtifacts = this.getBootstrapArtifacts(projectName, constraints.styleFramework || 'scss');
+    const configArtifacts = this.getBootstrapArtifacts(projectName, constraints.styleFramework || 'scss', !!constraints.generateStorybook);
     artifacts.push(...configArtifacts);
 
     return artifacts;
   }
 
-  private getBootstrapArtifacts(projectName: string, framework: string): any[] {
+  private getBootstrapArtifacts(projectName: string, framework: string, generateStorybook: boolean): any[] {
     const isTailwind = framework === 'tailwind';
 
     const pkg: any = {
@@ -91,18 +116,26 @@ export class Agent {
       scripts: {
         "dev": "vite",
         "build": "tsc && vite build",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "storybook": "storybook dev -p 6006",
+        "build-storybook": "storybook build"
       },
       dependencies: {
         "react": "^18.2.0",
         "react-dom": "^18.2.0"
       },
       devDependencies: {
+        "@testing-library/jest-dom": "^5.16.5",
+        "@testing-library/react": "^14.0.0",
         "@types/react": "^18.2.0",
         "@types/react-dom": "^18.2.0",
         "@vitejs/plugin-react": "^4.0.0",
+        "jsdom": "^22.0.0",
         "typescript": "^5.0.0",
-        "vite": "^4.3.0"
+        "vite": "^4.3.0",
+        "vitest": "^0.31.0"
       }
     };
 
@@ -114,10 +147,23 @@ export class Agent {
       pkg.devDependencies["sass"] = "^1.62.0";
     }
 
+    if (generateStorybook) {
+      pkg.devDependencies["storybook"] = "^7.0.0";
+      pkg.devDependencies["@storybook/react"] = "^7.0.0";
+      pkg.devDependencies["@storybook/react-vite"] = "^7.0.0";
+      pkg.devDependencies["@storybook/addon-essentials"] = "^7.0.0";
+      pkg.devDependencies["@storybook/addon-interactions"] = "^7.0.0";
+      pkg.devDependencies["@storybook/addon-links"] = "^7.0.0";
+    }
+
     const artifacts = [
       {
         path: "package.json",
         content: JSON.stringify(pkg, null, 2)
+      },
+      {
+        path: ".gitignore",
+        content: "node_modules\ndist\n.vscode\n.DS_Store\n*.local\n.env\n"
       },
       {
         path: "tsconfig.json",
@@ -157,7 +203,11 @@ export class Agent {
       },
       {
         path: "vite.config.ts",
-        content: `import { defineConfig } from 'vite'\nimport react from '@vitejs/plugin-react'\n\nexport default defineConfig({\n  plugins: [react()],\n})\n`
+        content: `/// <reference types="vitest" />\nimport { defineConfig } from 'vite'\nimport react from '@vitejs/plugin-react'\n\nexport default defineConfig({\n  plugins: [react()],\n  test: {\n    globals: true,\n    environment: 'jsdom',\n    setupFiles: './src/test/setup.ts',\n  },\n})\n`
+      },
+      {
+        path: "src/test/setup.ts",
+        content: "import '@testing-library/jest-dom';\n"
       },
       {
         path: "index.html",
@@ -181,6 +231,17 @@ export class Agent {
       artifacts.push({
         path: "src/index.css",
         content: `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`
+      });
+    }
+
+    if (generateStorybook) {
+      artifacts.push({
+        path: ".storybook/main.ts",
+        content: `import type { StorybookConfig } from "@storybook/react-vite";\n\nconst config: StorybookConfig = {\n  stories: ["../src/**/*.mdx", "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],\n  addons: [\n    "@storybook/addon-links",\n    "@storybook/addon-essentials",\n    "@storybook/addon-interactions",\n  ],\n  framework: {\n    name: "@storybook/react-vite",\n    options: {},\n  },\n  docs: {\n    autodocs: "tag",\n  },\n};\nexport default config;\n`
+      });
+      artifacts.push({
+        path: ".storybook/preview.ts",
+        content: `import type { Preview } from "@storybook/react";\nimport '../src/${isTailwind ? 'index.css' : 'App.scss'}';\n\nconst preview: Preview = {\n  parameters: {\n    actions: { argTypesRegex: "^on[A-Z].*" },\n    controls: {\n      matchers: {\n        color: /(background|color)$/i,\n        date: /Date$/i,\n      },\n    },\n  },\n};\n\nexport default preview;\n`
       });
     }
 
@@ -250,12 +311,18 @@ export class Agent {
     const reactCode = generateReactComponent(node, plan, constraints);
 
     const artifacts = [
-      { path: `src/components/${componentName}.tsx`, content: reactCode }
+      { path: `src/components/${componentName}.tsx`, content: reactCode },
+      { path: `src/components/${componentName}.test.tsx`, content: generateTest(componentName) }
     ];
 
     if (constraints.styleFramework !== 'tailwind') {
       const scssCode = generateScss(node, tokens, plan);
       artifacts.push({ path: `src/components/${componentName.toLowerCase()}.scss`, content: scssCode });
+    }
+
+    if (constraints.generateStorybook) {
+      const storyCode = generateStory(node, plan, componentName);
+      artifacts.push({ path: `src/components/${componentName}.stories.tsx`, content: storyCode });
     }
 
     return {
@@ -303,6 +370,63 @@ export class Agent {
       return Array.isArray(response) ? response : ["Add responsive breakpoints", "Optimize images", "Add ARIA labels"];
     } catch {
       return ["Add responsive breakpoints", "Optimize images", "Add ARIA labels"];
+    }
+  }
+
+  resolveFontDecision(decision: any) {
+    if (this.fontDecisionResolver) {
+      this.fontDecisionResolver(decision);
+      this.fontDecisionResolver = null;
+    }
+  }
+
+  private applyFontReplacements(node: DSLNode, replacements: Record<string, string>) {
+    const traverse = (n: DSLNode) => {
+      if (n.style?.fontName?.family && replacements[n.style.fontName.family]) {
+        n.style.fontName.family = replacements[n.style.fontName.family];
+      }
+      n.children?.forEach(traverse);
+    };
+    traverse(node);
+  }
+
+  private detectFonts(node: DSLNode): string[] {
+    const fonts = new Set<string>();
+    const collect = (n: DSLNode) => {
+      if (n.style?.fontName?.family) {
+        fonts.add(n.style.fontName.family);
+      }
+      n.children?.forEach(collect);
+    };
+    collect(node);
+    return Array.from(fonts);
+  }
+
+  private async analyzeFonts(fonts: string[]): Promise<{ family: string, isCommercial: boolean, suggestion?: string }[]> {
+    if (fonts.length === 0) return [];
+
+    const prompt = `
+      Analyze the following list of font families from a Figma design. 
+      Identify which ones are COMMERCIAL (paid/not web-safe/not in Google Fonts).
+      For each commercial font, suggest the BEST matching free alternative from Google Fonts.
+      
+      FONTS:
+      ${fonts.join(", ")}
+      
+      RETURN ONLY valid JSON array of objects in this format:
+      [
+        { "family": "Original Name", "isCommercial": true, "suggestion": "Suggested Google Font" },
+        { "family": "Arial", "isCommercial": false }
+      ]
+    `;
+
+    try {
+      const response = await this.aiService.chat(prompt);
+      const jsonText = response.replace(/```json|```/g, "").trim();
+      return JSON.parse(jsonText);
+    } catch (e) {
+      console.error("AI Font Analysis failed:", e);
+      return fonts.map(f => ({ family: f, isCommercial: false }));
     }
   }
 }
