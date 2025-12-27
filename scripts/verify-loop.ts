@@ -1,4 +1,4 @@
-import { GeminiService } from "./core/ai/gemini-service.js";
+import { GeminiService } from "../src/core/ai/gemini-service.js";
 
 async function verifyLoop() {
   console.log("🚀 Starting Gemini Loop Verification...");

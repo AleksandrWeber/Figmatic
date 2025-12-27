@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { Agent } from "./core/agent.ts";
-import { getFigmaFile } from "./core/figma/figma-api.ts";
+import { Agent } from "../src/core/agent.ts";
+import { getFigmaFile } from "../src/core/figma/figma-api.ts";
 
 async function verify() {
   console.log("🧪 Verifying Interactive Dialogue Mode...");

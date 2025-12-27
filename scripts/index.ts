@@ -1,8 +1,8 @@
 import "dotenv/config";
 import * as fs from "fs";
 import * as path from "path";
-import { getFigmaFile } from "./core/figma/figma-api.ts";
-import { Agent } from "./core/agent.ts";
+import { getFigmaFile } from "../src/core/figma/figma-api.ts";
+import { Agent } from "../src/core/agent.ts";
 
 async function run() {
   console.log("🚀 Figma agent started");

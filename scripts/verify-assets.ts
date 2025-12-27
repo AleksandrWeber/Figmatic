@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { getFigmaImages, downloadAsset } from "./core/figma/figma-api.ts";
+import { getFigmaImages, downloadAsset } from "../src/core/figma/figma-api.ts";
 import * as path from "path";
 import * as fs from "fs";
 

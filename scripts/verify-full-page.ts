@@ -1,5 +1,5 @@
-import { getFigmaFile } from "./core/figma/figma-api.js";
-import { Agent } from "./core/agent.js";
+import { getFigmaFile } from "../src/core/figma/figma-api.js";
+import { Agent } from "../src/core/agent.js";
 import * as fs from "fs";
 import * as path from "path";
 

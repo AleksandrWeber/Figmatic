@@ -2,8 +2,8 @@ import "dotenv/config";
 import * as fs from "fs";
 import * as path from "path";
 import * as readline from "readline";
-import { getFigmaFile } from "./core/figma/figma-api.ts";
-import { Agent } from "./core/agent.ts";
+import { getFigmaFile } from "../src/core/figma/figma-api.ts";
+import { Agent } from "../src/core/agent.ts";
 
 const rl = readline.createInterface({
   input: process.stdin,

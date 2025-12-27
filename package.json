@@ -77,7 +77,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "bundle": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.cjs --external:vscode --format=cjs --platform=node",
-    "dev": "node --loader ts-node/esm src/index.ts"
+    "dev": "node --loader ts-node/esm scripts/index.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
