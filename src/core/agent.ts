@@ -261,14 +261,14 @@ export class Agent {
 
     if (imageIds.length > 0) {
       console.log(`🤖 Agent: Exporting ${imageIds.length} images...`);
-      const imageUrls = await getFigmaImages(fileKey, imageIds, "png");
+      const imageUrls = await getFigmaImages(fileKey, imageIds, "png", onProgress);
       for (const [id, url] of Object.entries(imageUrls)) {
         if (url) {
           const node = this.findNodeByFigmaId(dsl, id);
           if (node) {
             onProgress?.(`⬇️ Downloading image: ${node.className}.png`);
             const dest = path.join(projectDir, "src", "assets", `${node.className}.png`);
-            await downloadAsset(url, dest);
+            await downloadAsset(url, dest, onProgress);
           }
         }
       }
@@ -276,14 +276,14 @@ export class Agent {
 
     if (vectorIds.length > 0) {
       console.log(`🤖 Agent: Exporting ${vectorIds.length} vectors/icons...`);
-      const vectorUrls = await getFigmaImages(fileKey, vectorIds, "svg");
+      const vectorUrls = await getFigmaImages(fileKey, vectorIds, "svg", onProgress);
       for (const [id, url] of Object.entries(vectorUrls)) {
         if (url) {
           const node = this.findNodeByFigmaId(dsl, id);
           if (node) {
             onProgress?.(`⬇️ Downloading icon: ${node.className}.svg`);
             const dest = path.join(projectDir, "src", "assets", "icons", `${node.className}.svg`);
-            await downloadAsset(url, dest);
+            await downloadAsset(url, dest, onProgress);
           }
         }
       }

@@ -95,7 +95,9 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
       }
 
       // Determine Project Directory and Cleanup
-      const data = await getFigmaFile(fileKey);
+      const data = await getFigmaFile(fileKey, (msg) => {
+        this._view?.webview.postMessage({ type: 'status', message: msg });
+      });
       this._view?.webview.postMessage({ type: 'status', message: `✅ Draft "${data.name}" retrieved.` });
 
       const projectName = data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'figmatic_project';

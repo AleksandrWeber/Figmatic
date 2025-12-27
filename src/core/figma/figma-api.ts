@@ -28,7 +28,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const THROTTLE_DELAY = 1000; // 1 second pause between successful requests to avoid spamming
 
 // ⏳ Centralized Fetch with Retry
-async function fetchWithRetry(url: string, options: any = {}, maxRetries: number = 7): Promise<any> {
+async function fetchWithRetry(url: string, options: any = {}, maxRetries: number = 7, onProgress?: (msg: string) => void): Promise<any> {
   const headers = {
     ...options.headers,
     "X-Figma-Token": getToken()
@@ -40,7 +40,9 @@ async function fetchWithRetry(url: string, options: any = {}, maxRetries: number
 
       if (response.status === 429) {
         const waitTime = Math.pow(2, attempt) * 3000; // Increased backoff base to 3s
-        console.log(`⏳ Rate limited (429), waiting ${waitTime / 1000}s (attempt ${attempt}/${maxRetries})...`);
+        const msg = `⏳ Rate limited (429), waiting ${waitTime / 1000}s (attempt ${attempt}/${maxRetries})...`;
+        console.log(msg);
+        onProgress?.(msg);
         await sleep(waitTime);
         continue;
       }
@@ -58,13 +60,15 @@ async function fetchWithRetry(url: string, options: any = {}, maxRetries: number
       return response;
     } catch (err: any) {
       if (attempt === maxRetries) throw err;
-      console.log(`⚠️ Request failed, retrying (${attempt}/${maxRetries}): ${err.message}`);
+      const msg = `⚠️ Request failed, retrying (${attempt}/${maxRetries}): ${err.message}`;
+      console.log(msg);
+      onProgress?.(msg);
       await sleep(2000);
     }
   }
 }
 
-export async function getFigmaFile(fileKey: string) {
+export async function getFigmaFile(fileKey: string, onProgress?: (msg: string) => void) {
   const cachePath = path.join(CACHE_DIR, `${fileKey}.json`);
 
   if (fs.existsSync(cachePath)) {
@@ -73,7 +77,7 @@ export async function getFigmaFile(fileKey: string) {
   }
 
   const url = `${FIGMA_API_BASE_URL}/files/${fileKey}`;
-  const response = await fetchWithRetry(url);
+  const response = await fetchWithRetry(url, {}, 7, onProgress);
   const data = await response.json();
 
   if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
@@ -82,25 +86,25 @@ export async function getFigmaFile(fileKey: string) {
   return data;
 }
 
-export async function getFigmaImages(fileKey: string, ids: string[], format: string = "png"): Promise<Record<string, string>> {
+export async function getFigmaImages(fileKey: string, ids: string[], format: string = "png", onProgress?: (msg: string) => void): Promise<Record<string, string>> {
   if (ids.length === 0) return {};
 
   const idsParam = ids.join(",");
   const url = `${FIGMA_API_BASE_URL}/images/${fileKey}?ids=${idsParam}&format=${format}`;
 
   console.log(`👉 Fetching Image URLs (format: ${format})`);
-  const response = await fetchWithRetry(url);
+  const response = await fetchWithRetry(url, {}, 7, onProgress);
   const data = (await response.json()) as { images: Record<string, string> };
 
   return data.images || {};
 }
 
-export async function downloadAsset(url: string, dest: string): Promise<void> {
+export async function downloadAsset(url: string, dest: string, onProgress?: (msg: string) => void): Promise<void> {
   const parentDir = path.dirname(dest);
   if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
 
   console.log(`👉 Downloading asset: ${path.basename(dest)}`);
-  const response = await fetchWithRetry(url);
+  const response = await fetchWithRetry(url, {}, 7, onProgress);
   const buffer = await response.buffer();
 
   fs.writeFileSync(dest, buffer);
