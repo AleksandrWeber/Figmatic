@@ -6,8 +6,8 @@ import * as fs from 'fs';
 
 function extractFileKey(input: string): string {
   const trimmed = input.trim();
-  // Match Figma URL pattern: figma.com/file/KEY/...
-  const match = trimmed.match(/figma\.com\/file\/([a-zA-Z0-9]+)/);
+  // Match Figma URL patterns: figma.com/file/KEY/... or figma.com/design/KEY/...
+  const match = trimmed.match(/figma\.com\/(?:file|design)\/([a-zA-Z0-9_]+)/);
   return match ? match[1] : trimmed;
 }
 
@@ -67,55 +67,67 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _handleGenerate(rawFileKey: string, instructions?: string, figmaToken?: string, geminiToken?: string, customOutputDir?: string) {
-    const fileKey = extractFileKey(rawFileKey);
+    try {
+      const fileKey = extractFileKey(rawFileKey);
 
-    // Prioritize VS Code Config for Gemini API Key
-    const config = vscode.workspace.getConfiguration('figmatic');
-    const configGeminiKey = config.get<string>('geminiApiKey');
+      // Prioritize VS Code Config for Gemini API Key
+      const config = vscode.workspace.getConfiguration('figmatic');
+      const configGeminiKey = config.get<string>('geminiApiKey');
 
-    if (figmaToken) process.env.FIGMA_TOKEN = figmaToken;
-    if (geminiToken) process.env.GEMINI_API_KEY = geminiToken;
-    if (configGeminiKey) process.env.GEMINI_API_KEY = configGeminiKey;
+      if (figmaToken) process.env.FIGMA_TOKEN = figmaToken;
+      if (geminiToken) process.env.GEMINI_API_KEY = geminiToken;
+      if (configGeminiKey) process.env.GEMINI_API_KEY = configGeminiKey;
 
-    if (!fileKey) {
-      vscode.window.showErrorMessage('❌ Please provide a Figma File Key');
-      return;
-    }
-
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    let outputDir = customOutputDir;
-
-    if (!outputDir) {
-      if (!workspaceFolders) {
-        vscode.window.showErrorMessage('❌ Please open a workspace folder first or pick a destination.');
-        return;
+      if (!fileKey) {
+        throw new Error('Please provide a Figma File Key or URL');
       }
-      outputDir = workspaceFolders[0].uri.fsPath;
-    }
 
-    // Determine Project Directory and Cleanup
-    const data = await getFigmaFile(fileKey); // Fetch Figma data early to get project name
-    const projectName = data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'figmatic_project';
-    const projectDir = path.join(outputDir, projectName);
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      let outputDir = customOutputDir;
 
-    if (fs.existsSync(projectDir)) {
-      this._view?.webview.postMessage({ type: 'status', message: `🧹 Cleaning up existing folder "${projectName}"...` });
-      fs.rmSync(projectDir, { recursive: true, force: true });
-    }
-    fs.mkdirSync(projectDir, { recursive: true });
+      if (!outputDir) {
+        if (!workspaceFolders) {
+          throw new Error('Please open a workspace folder first or pick a destination.');
+        }
+        outputDir = workspaceFolders[0].uri.fsPath;
+      }
 
+      // Determine Project Directory and Cleanup
+      const data = await getFigmaFile(fileKey);
+      const projectName = data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'figmatic_project';
+      const projectDir = path.join(outputDir, projectName);
 
-    vscode.window.withProgress({
-      location: vscode.ProgressLocation.Notification,
-      title: "Figmatic: Generating Architect Plan...",
-      cancellable: false
-    }, async (progress: vscode.Progress<{ message?: string; increment?: number }>) => {
-      try {
+      if (fs.existsSync(projectDir)) {
+        this._view?.webview.postMessage({ type: 'status', message: `🧹 Cleaning up folder "${projectName}"...` });
+        fs.rmSync(projectDir, { recursive: true, force: true });
+      }
+      fs.mkdirSync(projectDir, { recursive: true });
+
+      await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: "Figmatic: Generating Architect Plan...",
+        cancellable: false
+      }, async (progress) => {
         progress.report({ message: "Analyzing architecture..." });
         this._view?.webview.postMessage({ type: 'status', message: '🧠 AI Architect is planning...' });
 
-        const firstFrame = data.document.children[0].children[0];
-        const config = vscode.workspace.getConfiguration('figmatic');
+        // Smart Search for First Frame/Component
+        const findFirstMainNode = (node: any): any => {
+          if (node.type === 'FRAME' || node.type === 'COMPONENT') return node;
+          if (node.children) {
+            for (const child of node.children) {
+              const found = findFirstMainNode(child);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+
+        const firstFrame = findFirstMainNode(data.document) || (data.document.children?.[0]?.children?.[0]);
+        if (!firstFrame) {
+          throw new Error("Could not find any frames or components in this Figma file. Please ensure the file is not empty.");
+        }
+
         const styleFramework = config.get<string>('styleFramework') || 'scss';
         const generateStorybook = config.get<boolean>('generateStorybook') || false;
 
@@ -136,7 +148,7 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
           fs.writeFileSync(filePath, art.content, 'utf-8');
         }
 
-        // --- NEW: Refinement - Git Initializer ---
+        // --- Git Initializer ---
         try {
           const { execSync } = require('child_process');
           execSync('git init', { cwd: projectDir, stdio: 'ignore' });
@@ -144,7 +156,6 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
         } catch (gitErr) {
           console.warn("Git initialization failed:", gitErr);
         }
-        // ----------------------------------------
 
         const suggestions = await this._activeAgent.getPostGenerationSuggestions(projectName);
         this._view?.webview.postMessage({ type: 'completed', projectName, suggestions });
@@ -157,11 +168,11 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
               vscode.commands.executeCommand('vscode.openFolder', uri, true);
             }
           });
-      } catch (err: any) {
-        this._view?.webview.postMessage({ type: 'error', message: err.message });
-        vscode.window.showErrorMessage(`💥 Figmatic Error: ${err.message}`);
-      }
-    });
+      });
+    } catch (err: any) {
+      this._view?.webview.postMessage({ type: 'error', message: err.message });
+      vscode.window.showErrorMessage(`💥 Figmatic Error: ${err.message}`);
+    }
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {
