@@ -4,6 +4,10 @@
   "description": "AI-powered Senior Frontend Architect that transforms Figma designs into production-ready React + SCSS code.",
   "version": "1.0.0",
   "publisher": "OleksandrShvachko",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksandrWeber/Figmatic.git"
+  },
   "icon": "assets/logo.png",
   "engines": {
     "vscode": "^1.80.0"
