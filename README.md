@@ -14,11 +14,22 @@
 **Figmatic** is an advanced AI-powered **VS Code Extension** that transforms Figma designs into production-ready React + SCSS code. It acts as a **Senior Frontend Architect**, interpreting design intent and planning modular component hierarchies.
 
 ### Key Features ✨
-- **Smart URL Parser**: Paste a full Figma URL; the extension extracts the File ID automatically.
-- **VS Code Settings Integration**: Securely store your Gemini API Key in VS Code Settings (`Settings -> Figmatic`).
-- **Granular Progress & Timer**: Watch the agent work with live step-by-step logs and an estimated time countdown.
-- **Custom Output Folder**: Select any directory in your workspace for the generated project.
-- **Asset Management**: Automatic backup and download of high-res images and SVG icons.
+- **🛡️ Easy Setup**: Securely store your Gemini API Key in VS Code Settings.
+- **🔗 Smart URL Parser**: Supports full Figma URLs; automatically extracts File IDs.
+- **🏗️ Automated Bootstrapping**: Generates a complete **Vite + React + TypeScript** project with a single click.
+- **⏱️ Live Progress & Timer**: Track every AI action in real-time with an estimated completion timer.
+- **🧠 Senior Architect AI**: Generates semantic HTML5, BEM-styled SCSS, and modular React code.
+- **🧹 Auto-Cleanup**: Smart project directory management to ensure a fresh start every time.
+- **✨ AI Post-Generation Loop**: Proactive suggestions for performance, A11y, and feature improvements.
+
+## 🚀 Quick Start
+
+1. Install the extension.
+2. Go to **VS Code Settings** and search for `Figmatic`. Enter your `Gemini API Key`.
+3. Open the **Figmatic Sidebar** in the Activity Bar.
+4. Paste your **Figma URL** (e.g., `https://www.figma.com/file/KEY/...`).
+5. Click **Generate** and watch the magic happen!
+6. Once finished, run `npm install` and `npm run dev` in the output folder.
 
 ### Technical Setup 🛠️
 
@@ -43,11 +54,22 @@
 **Figmatic** — це просунуте **розширення для VS Code** на базі ШІ, яке перетворює дизайни Figma на готовий до продакшену React + SCSS код. Figmatic працює як **Senior Frontend Architect**, аналізуючи структуру дизайну та створюючи модульну архітектуру компонентів.
 
 ### Основні можливості ✨
-- **Розумний парсер посилань**: Вставте повну адресу проекту Figma — розширення саме знайде потрібний ID.
-- **Інтеграція з налаштуваннями VS Code**: Безпечно зберігайте Gemini API Key у налаштуваннях редактора (`Settings -> Figmatic`).
-- **Прогрес-бар та таймер**: Слідкуйте за роботою ШІ в режимі реального часу з логами та зворотним відліком часу.
-- **Вибір папки завантаження**: Вибирайте будь-яку папку у вашому просторі для створення проекту.
-- **Керування асетами**: Автоматичне завантаження зображень та іконок високої якості.
+- **🛡️ Легке налаштування**: Зберігайте Gemini API Key безпечно у налаштуваннях VS Code.
+- **🔗 Smart URL Parser**: Вставляйте повне посилання на Figma; ID витягнеться автоматично.
+- **🏗️ Автоматичне розгортання**: Генерує повний **Vite + React + TypeScript** проект «під ключ».
+- **⏱️ Живий прогрес та Таймер**: Слідкуйте за кожним кроком ШІ в реальному часі.
+- **🧠 Senior Architect AI**: Семантичний HTML5, SCSS (BEM) та модульний React-код.
+- **🧹 Розумне очищення**: Автоматичне прибирання старих асетів перед новою генерацією.
+- **✨ Цикл вдосконалення**: Пост-генераційні поради від ШІ щодо A11y та швидкодії.
+
+## 🚀 Швидкий старт
+
+1. Встановіть розширення.
+2. Перейдіть у **Налаштування VS Code**, знайдіть `Figmatic` і введіть ваш `Gemini API Key`.
+3. Відкрийте **панель Figmatic** в Activity Bar.
+4. Вставте **посилання на Figma** (наприклад, `https://www.figma.com/file/KEY/...`).
+5. Натисніть **Generate** і спостерігайте за процесом!
+6. Після завершення запустіть `npm install` та `npm run dev` у папці проекту.
 
 ### Технічне налаштування 🛠️
 
