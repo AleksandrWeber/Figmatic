@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path 
+    fill="currentColor" 
+    d="M20,20 v12 h50 c5,0 8,3 8,8 s-3,8 -8,8 H20 v12 h45 l15,10 l-15,10 H20 v12 h15 v-12 h30 l25,-20 l-25,-20 h-5 c5,0 8,-3 8,-8 s-3,-8 -8,-8 H20 Z" 
+    opacity="1"
+  />
+</svg>

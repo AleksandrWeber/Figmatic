@@ -20,7 +20,7 @@
         {
           "id": "figmatic-explorer",
           "title": "Figmatic",
-          "icon": "assets/logo.png"
+          "icon": "assets/sidebar-icon.svg"
         }
       ]
     },
@@ -30,7 +30,7 @@
           "type": "webview",
           "id": "figmatic.sidebar",
           "name": "Figmatic",
-          "icon": "assets/logo.png"
+          "icon": "assets/sidebar-icon.svg"
         }
       ]
     },
