@@ -36,6 +36,16 @@
     "configuration": {
       "title": "Figmatic",
       "properties": {
+        "figmatic.styleFramework": {
+          "type": "string",
+          "enum": [
+            "scss",
+            "tailwind"
+          ],
+          "default": "scss",
+          "description": "The default styling framework for generated projects.",
+          "scope": "application"
+        },
         "figmatic.geminiApiKey": {
           "type": "string",
           "default": "",

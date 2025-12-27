@@ -38,17 +38,23 @@ export class Agent {
     // 4. Process each section ...
     const sections = fullDsl.children || [];
     const sectionMetadata: { name: string, fileName: string }[] = [];
-    const artifacts: any[] = [
-      { path: "src/_variables.scss", content: tokenScss },
-      {
-        path: "src/_reset.scss",
-        content: `* { margin: 0; padding: 0; box-sizing: border-box; }\nhtml, body { height: 100%; }\nimg, picture, video, canvas, svg { display: block; max-width: 100%; }\ninput, button, textarea, select { font: inherit; }\np, h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; }\n`
-      },
-      {
-        path: "src/_base.scss",
-        content: `@import 'reset';\n@import 'variables';\n\nbody {\n  font-family: 'Inter', sans-serif;\n  -webkit-font-smoothing: antialiased;\n  background-color: white;\n}\n`
-      }
-    ];
+    const isTailwind = constraints.styleFramework === 'tailwind';
+
+    const artifacts: any[] = [];
+
+    if (!isTailwind) {
+      artifacts.push(
+        { path: "src/_variables.scss", content: tokenScss },
+        {
+          path: "src/_reset.scss",
+          content: `* { margin: 0; padding: 0; box-sizing: border-box; }\nhtml, body { height: 100%; }\nimg, picture, video, canvas, svg { display: block; max-width: 100%; }\ninput, button, textarea, select { font: inherit; }\np, h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; }\n`
+        },
+        {
+          path: "src/_base.scss",
+          content: `@import 'reset';\n@import 'variables';\n\nbody {\n  font-family: 'Inter', sans-serif;\n  -webkit-font-smoothing: antialiased;\n  background-color: white;\n}\n`
+        }
+      );
+    }
 
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i];
@@ -60,45 +66,58 @@ export class Agent {
 
     // 5. Generate Root Orchestrator
     onProgress?.("🏗️ Generating Root Orchestrator (App.tsx)...");
-    const rootCode = generateRootComponent(sectionMetadata);
+    const rootCode = generateRootComponent(sectionMetadata, constraints);
     artifacts.push({ path: "src/App.tsx", content: rootCode });
-    artifacts.push({ path: "src/App.scss", content: "@import 'base';\n\n.app-container {\n  display: flex;\n  flex-direction: column;\n  min-height: 100vh;\n}\n" });
+    if (!isTailwind) {
+      artifacts.push({ path: "src/App.scss", content: "@import 'base';\n\n.app-container {\n  display: flex;\n  flex-direction: column;\n  min-height: 100vh;\n}\n" });
+    }
 
     // 6. Project Bootstrapping (Config Files)
     onProgress?.("📦 Bootstrapping project environment...");
-    const configArtifacts = this.getBootstrapArtifacts(projectName);
+    const configArtifacts = this.getBootstrapArtifacts(projectName, constraints.styleFramework || 'scss');
     artifacts.push(...configArtifacts);
 
     return artifacts;
   }
 
-  private getBootstrapArtifacts(projectName: string): any[] {
-    return [
+  private getBootstrapArtifacts(projectName: string, framework: string): any[] {
+    const isTailwind = framework === 'tailwind';
+
+    const pkg: any = {
+      name: projectName,
+      version: "1.0.0",
+      private: true,
+      type: "module",
+      scripts: {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview"
+      },
+      dependencies: {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0"
+      },
+      devDependencies: {
+        "@types/react": "^18.2.0",
+        "@types/react-dom": "^18.2.0",
+        "@vitejs/plugin-react": "^4.0.0",
+        "typescript": "^5.0.0",
+        "vite": "^4.3.0"
+      }
+    };
+
+    if (isTailwind) {
+      pkg.devDependencies["tailwindcss"] = "^3.3.0";
+      pkg.devDependencies["autoprefixer"] = "^10.4.0";
+      pkg.devDependencies["postcss"] = "^8.4.0";
+    } else {
+      pkg.devDependencies["sass"] = "^1.62.0";
+    }
+
+    const artifacts = [
       {
         path: "package.json",
-        content: JSON.stringify({
-          name: projectName,
-          version: "1.0.0",
-          private: true,
-          type: "module",
-          scripts: {
-            "dev": "vite",
-            "build": "tsc && vite build",
-            "preview": "vite preview"
-          },
-          dependencies: {
-            "react": "^18.2.0",
-            "react-dom": "^18.2.0"
-          },
-          devDependencies: {
-            "@types/react": "^18.2.0",
-            "@types/react-dom": "^18.2.0",
-            "@vitejs/plugin-react": "^4.0.0",
-            "sass": "^1.62.0",
-            "typescript": "^5.0.0",
-            "vite": "^4.3.0"
-          }
-        }, null, 2)
+        content: JSON.stringify(pkg, null, 2)
       },
       {
         path: "tsconfig.json",
@@ -146,9 +165,26 @@ export class Agent {
       },
       {
         path: "src/main.tsx",
-        content: `import React from 'react'\nimport ReactDOM from 'react-dom/client'\nimport App from './App.tsx'\nimport './App.scss'\n\nReactDOM.createRoot(document.getElementById('root')!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>,\n)\n`
+        content: `import React from 'react'\nimport ReactDOM from 'react-dom/client'\nimport App from './App.tsx'\nimport './${isTailwind ? 'index.css' : 'App.scss'}'\n\nReactDOM.createRoot(document.getElementById('root')!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>,\n)\n`
       }
     ];
+
+    if (isTailwind) {
+      artifacts.push({
+        path: "tailwind.config.js",
+        content: `/** @type {import('tailwindcss').Config} */\nexport default {\n  content: [\n    "./index.html",\n    "./src/**/*.{js,ts,jsx,tsx}",\n  ],\n  theme: {\n    extend: {},\n  },\n  plugins: [],\n}\n`
+      });
+      artifacts.push({
+        path: "postcss.config.js",
+        content: `export default {\n  plugins: {\n    tailwindcss: {},\n    autoprefixer: {},\n  },\n}\n`
+      });
+      artifacts.push({
+        path: "src/index.css",
+        content: `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`
+      });
+    }
+
+    return artifacts;
   }
 
   private async handleAssets(dsl: DSLNode, fileKey: string, projectDir: string, onProgress?: (msg: string) => void) {
@@ -211,14 +247,19 @@ export class Agent {
     const plan: ArchitecturePlan = await this.planner.createPlan(node, constraints, userInstructions);
 
     const componentName = plan.rootComponent || node.name.replace(/\s+/g, "");
-    const reactCode = generateReactComponent(node, plan);
-    const scssCode = generateScss(node, tokens, plan);
+    const reactCode = generateReactComponent(node, plan, constraints);
+
+    const artifacts = [
+      { path: `src/components/${componentName}.tsx`, content: reactCode }
+    ];
+
+    if (constraints.styleFramework !== 'tailwind') {
+      const scssCode = generateScss(node, tokens, plan);
+      artifacts.push({ path: `src/components/${componentName.toLowerCase()}.scss`, content: scssCode });
+    }
 
     return {
-      artifacts: [
-        { path: `src/components/${componentName}.tsx`, content: reactCode },
-        { path: `src/components/${componentName.toLowerCase()}.scss`, content: scssCode }
-      ],
+      artifacts,
       componentName
     };
   }

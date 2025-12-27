@@ -41,7 +41,7 @@ export class CodePlanner {
       TASKS:
       1. Interpret the design: detect components, list semantic tags (nav, main, button, etc.).
       2. Plan the React component architecture.
-      3. Define a style strategy (variables, mixins for SCSS).
+      3. Define a style strategy. IMPORTANT: ${constraints.styleFramework === 'tailwind' ? 'Use TAILWIND CSS utility classes for ALL styles. DO NOT generate SCSS.' : 'Define variables and BEM mixins for SCSS.'}
       4. List the files to be created.
 
       RETURN ONLY JSON in this format:

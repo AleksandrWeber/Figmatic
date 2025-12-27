@@ -108,8 +108,11 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
         this._view?.webview.postMessage({ type: 'status', message: '🧠 AI Architect is planning...' });
 
         const firstFrame = data.document.children[0].children[0];
+        const config = vscode.workspace.getConfiguration('figmatic');
+        const styleFramework = config.get<string>('styleFramework') || 'scss';
+
         const agent = new Agent();
-        const artifacts = await agent.processFullPage(firstFrame, fileKey, projectDir, {}, instructions, (msg) => {
+        const artifacts = await agent.processFullPage(firstFrame, fileKey, projectDir, { styleFramework }, instructions, (msg) => {
           this._view?.webview.postMessage({ type: 'status', message: msg });
         });
 

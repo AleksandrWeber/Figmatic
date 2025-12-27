@@ -1,13 +1,14 @@
 import { DSLNode } from "../dsl/dsl-parser.ts";
 import { ArchitecturePlan, ComponentPlan } from "../ai/code-planner.ts";
 
-export function generateReactComponent(node: DSLNode, plan: ArchitecturePlan): string {
+export function generateReactComponent(node: DSLNode, plan: ArchitecturePlan, constraints: any = {}): string {
   const componentName = plan.rootComponent || node.name.replace(/\s+/g, "");
+  const isTailwind = constraints.styleFramework === 'tailwind';
 
   const childrenCode = node.children?.map(child => generateNodeJSX(child, plan.components)).join("\n") || "";
 
   return `import React from 'react';
-import './${componentName.toLowerCase()}.scss';
+${isTailwind ? '' : `import './${componentName.toLowerCase()}.scss';`}
 
 export const ${componentName}: React.FC = () => {
   return (
@@ -38,12 +39,12 @@ function generateNodeJSX(node: DSLNode, components?: ComponentPlan[]): string {
   }
 
   if (node.type === "Image") {
-    const src = `/assets/${node.className}.png`;
+    const src = `../assets/${node.className}.png`;
     return `<img className="${node.className}" src="${src}" alt="${node.name}" />`;
   }
 
   if (node.type === "Vector") {
-    const src = `/assets/icons/${node.className}.svg`;
+    const src = `../assets/icons/${node.className}.svg`;
     return `<img className="${node.className}" src="${src}" alt="${node.name}" />`;
   }
 
@@ -52,7 +53,7 @@ ${childrenCode.split('\n').map(line => '  ' + line).join('\n')}
 </${tag}>`;
 }
 
-export function generateRootComponent(sections: { name: string, fileName: string }[]): string {
+export function generateRootComponent(sections: { name: string, fileName: string }[], constraints: any = {}): string {
   const imports = sections
     .map(s => `import { ${s.name} } from './components/${s.name}';`)
     .join('\n');
@@ -61,9 +62,11 @@ export function generateRootComponent(sections: { name: string, fileName: string
     .map(s => `      <${s.name} />`)
     .join('\n');
 
+  const isTailwind = constraints.styleFramework === 'tailwind';
+
   return `import React from 'react';
 ${imports}
-import './App.scss';
+${isTailwind ? "" : "import './App.scss';"}
 
 export const App: React.FC = () => {
   return (
