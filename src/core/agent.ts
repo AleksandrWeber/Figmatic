@@ -21,6 +21,8 @@ export class Agent {
     onProgress?.(`🤖 Agent: Processing full page design "${rootNode.name}" in folder "${path.basename(projectDir)}"...`);
     console.log(`🤖 Agent: Processing full page design "${rootNode.name}"...`);
 
+    const projectName = rootNode.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'figmatic_project';
+
     // 1. Parse Full Page to DSL
     const fullDsl = figmaToDSL(rootNode);
 
@@ -37,13 +39,13 @@ export class Agent {
     const sections = fullDsl.children || [];
     const sectionMetadata: { name: string, fileName: string }[] = [];
     const artifacts: any[] = [
-      { path: "_variables.scss", content: tokenScss },
+      { path: "src/_variables.scss", content: tokenScss },
       {
-        path: "_reset.scss",
+        path: "src/_reset.scss",
         content: `* { margin: 0; padding: 0; box-sizing: border-box; }\nhtml, body { height: 100%; }\nimg, picture, video, canvas, svg { display: block; max-width: 100%; }\ninput, button, textarea, select { font: inherit; }\np, h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; }\n`
       },
       {
-        path: "_base.scss",
+        path: "src/_base.scss",
         content: `@import 'reset';\n@import 'variables';\n\nbody {\n  font-family: 'Inter', sans-serif;\n  -webkit-font-smoothing: antialiased;\n  background-color: white;\n}\n`
       }
     ];
@@ -57,12 +59,96 @@ export class Agent {
     }
 
     // 5. Generate Root Orchestrator
-    console.log("🤖 Agent: Generating Root Orchestrator (App.tsx)...");
+    onProgress?.("🏗️ Generating Root Orchestrator (App.tsx)...");
     const rootCode = generateRootComponent(sectionMetadata);
-    artifacts.push({ path: "App.tsx", content: rootCode });
-    artifacts.push({ path: "App.scss", content: "@import 'base';\n\n.app-container {\n  display: flex;\n  flex-direction: column;\n  min-height: 100vh;\n}\n" });
+    artifacts.push({ path: "src/App.tsx", content: rootCode });
+    artifacts.push({ path: "src/App.scss", content: "@import 'base';\n\n.app-container {\n  display: flex;\n  flex-direction: column;\n  min-height: 100vh;\n}\n" });
+
+    // 6. Project Bootstrapping (Config Files)
+    onProgress?.("📦 Bootstrapping project environment...");
+    const configArtifacts = this.getBootstrapArtifacts(projectName);
+    artifacts.push(...configArtifacts);
 
     return artifacts;
+  }
+
+  private getBootstrapArtifacts(projectName: string): any[] {
+    return [
+      {
+        path: "package.json",
+        content: JSON.stringify({
+          name: projectName,
+          version: "1.0.0",
+          private: true,
+          type: "module",
+          scripts: {
+            "dev": "vite",
+            "build": "tsc && vite build",
+            "preview": "vite preview"
+          },
+          dependencies: {
+            "react": "^18.2.0",
+            "react-dom": "^18.2.0"
+          },
+          devDependencies: {
+            "@types/react": "^18.2.0",
+            "@types/react-dom": "^18.2.0",
+            "@vitejs/plugin-react": "^4.0.0",
+            "sass": "^1.62.0",
+            "typescript": "^5.0.0",
+            "vite": "^4.3.0"
+          }
+        }, null, 2)
+      },
+      {
+        path: "tsconfig.json",
+        content: JSON.stringify({
+          compilerOptions: {
+            target: "ESNext",
+            useDefineForClassFields: true,
+            lib: ["DOM", "DOM.Iterable", "ESNext"],
+            allowJs: false,
+            skipLibCheck: true,
+            esModuleInterop: false,
+            allowSyntheticDefaultImports: true,
+            strict: true,
+            forceConsistentCasingInFileNames: true,
+            module: "ESNext",
+            moduleResolution: "Node",
+            resolveJsonModule: true,
+            isolatedModules: true,
+            noEmit: true,
+            jsx: "react-jsx"
+          },
+          include: ["src"],
+          references: [{ path: "./tsconfig.node.json" }]
+        }, null, 2)
+      },
+      {
+        path: "tsconfig.node.json",
+        content: JSON.stringify({
+          compilerOptions: {
+            composite: true,
+            module: "ESNext",
+            moduleResolution: "Node",
+            allowSyntheticDefaultImports: true
+          },
+          include: ["vite.config.ts"]
+        }, null, 2)
+      },
+      {
+        path: "vite.config.ts",
+        content: `import { defineConfig } from 'vite'\nimport react from '@vitejs/plugin-react'\n\nexport default defineConfig({\n  plugins: [react()],\n})\n`
+      },
+      {
+        path: "index.html",
+        content: `<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <link rel="icon" type="image/svg+xml" href="/vite.svg" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>${projectName}</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>\n`
+      },
+      {
+        path: "src/main.tsx",
+        content: `import React from 'react'\nimport ReactDOM from 'react-dom/client'\nimport App from './App.tsx'\nimport './App.scss'\n\nReactDOM.createRoot(document.getElementById('root')!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>,\n)\n`
+      }
+    ];
   }
 
   private async handleAssets(dsl: DSLNode, fileKey: string, projectDir: string, onProgress?: (msg: string) => void) {
@@ -84,7 +170,7 @@ export class Agent {
           const node = this.findNodeByFigmaId(dsl, id);
           if (node) {
             onProgress?.(`⬇️ Downloading image: ${node.className}.png`);
-            const dest = path.join(projectDir, "assets", `${node.className}.png`);
+            const dest = path.join(projectDir, "src", "assets", `${node.className}.png`);
             await downloadAsset(url, dest);
           }
         }
@@ -99,7 +185,7 @@ export class Agent {
           const node = this.findNodeByFigmaId(dsl, id);
           if (node) {
             onProgress?.(`⬇️ Downloading icon: ${node.className}.svg`);
-            const dest = path.join(projectDir, "assets", "icons", `${node.className}.svg`);
+            const dest = path.join(projectDir, "src", "assets", "icons", `${node.className}.svg`);
             await downloadAsset(url, dest);
           }
         }
@@ -130,8 +216,8 @@ export class Agent {
 
     return {
       artifacts: [
-        { path: `components/${componentName}.tsx`, content: reactCode },
-        { path: `components/${componentName.toLowerCase()}.scss`, content: scssCode }
+        { path: `src/components/${componentName}.tsx`, content: reactCode },
+        { path: `src/components/${componentName.toLowerCase()}.scss`, content: scssCode }
       ],
       componentName
     };
