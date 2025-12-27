@@ -82,6 +82,8 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
         throw new Error('Please provide a Figma File Key or URL');
       }
 
+      this._view?.webview.postMessage({ type: 'status', message: '📡 Connecting to Figma API...' });
+
       const workspaceFolders = vscode.workspace.workspaceFolders;
       let outputDir = customOutputDir;
 
@@ -94,6 +96,8 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
 
       // Determine Project Directory and Cleanup
       const data = await getFigmaFile(fileKey);
+      this._view?.webview.postMessage({ type: 'status', message: `✅ Draft "${data.name}" retrieved.` });
+
       const projectName = data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'figmatic_project';
       const projectDir = path.join(outputDir, projectName);
 
@@ -108,8 +112,8 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
         title: "Figmatic: Generating Architect Plan...",
         cancellable: false
       }, async (progress) => {
-        progress.report({ message: "Analyzing architecture..." });
         this._view?.webview.postMessage({ type: 'status', message: '🧠 AI Architect is planning...' });
+        progress.report({ message: "Analyzing architecture..." });
 
         // Smart Search for First Frame/Component
         const findFirstMainNode = (node: any): any => {
