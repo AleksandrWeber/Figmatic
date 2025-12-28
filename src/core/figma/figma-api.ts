@@ -18,8 +18,17 @@ function getToken(): string {
 }
 
 // 📁 Cache settings
-// 📁 Cache settings - Use absolute path relative to the process or extension
-const CACHE_DIR = path.resolve(process.env.FIGMATIC_CACHE_DIR || path.join(process.cwd(), "cache"));
+let CUSTOM_CACHE_DIR: string | null = null;
+
+export function setCacheDir(dir: string) {
+  CUSTOM_CACHE_DIR = dir;
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function getCacheDir(): string {
+  if (CUSTOM_CACHE_DIR) return CUSTOM_CACHE_DIR;
+  return path.resolve(process.env.FIGMATIC_CACHE_DIR || path.join(process.cwd(), "cache"));
+}
 
 // ⏳ helper
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -69,7 +78,7 @@ async function fetchWithRetry(url: string, options: any = {}, maxRetries: number
 }
 
 export async function getFigmaFile(fileKey: string, onProgress?: (msg: string) => void) {
-  const cachePath = path.join(CACHE_DIR, `${fileKey}.json`);
+  const cachePath = path.join(getCacheDir(), `${fileKey}.json`);
 
   if (fs.existsSync(cachePath)) {
     console.log(`📦 Using cached Figma file: ${fileKey}.json`);
@@ -80,7 +89,7 @@ export async function getFigmaFile(fileKey: string, onProgress?: (msg: string) =
   const response = await fetchWithRetry(url, {}, 7, onProgress);
   const data = await response.json();
 
-  if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+  if (!fs.existsSync(getCacheDir())) fs.mkdirSync(getCacheDir(), { recursive: true });
   fs.writeFileSync(cachePath, JSON.stringify(data, null, 2), "utf-8");
 
   return data;

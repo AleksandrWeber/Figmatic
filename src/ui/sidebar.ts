@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { Agent } from '../core/agent.ts';
-import { getFigmaFile } from '../core/figma/figma-api.ts';
+import { getFigmaFile, setCacheDir } from '../core/figma/figma-api.ts';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -95,6 +95,7 @@ export class FigmaticSidebarProvider implements vscode.WebviewViewProvider {
       }
 
       // Determine Project Directory and Cleanup
+      setCacheDir(path.join(outputDir, ".figmatic_cache"));
       const data = await getFigmaFile(fileKey, (msg) => {
         this._view?.webview.postMessage({ type: 'status', message: msg });
       });
