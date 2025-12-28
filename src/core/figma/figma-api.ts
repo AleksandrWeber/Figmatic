@@ -48,11 +48,20 @@ async function fetchWithRetry(url: string, options: any = {}, maxRetries: number
       const response = await fetch(url, { ...options, headers });
 
       if (response.status === 429) {
-        const waitTime = Math.pow(2, attempt) * 3000; // Increased backoff base to 3s
-        const msg = `⏳ Rate limited (429), waiting ${waitTime / 1000}s (attempt ${attempt}/${maxRetries})...`;
+        // --- NEW: Strict Retry-After Handling ---
+        const retryAfterHeader = response.headers.get("retry-after");
+        let waitTimeSeconds = Math.pow(2, attempt) * 3; // Fallback: 6s, 12s, 24s...
+
+        if (retryAfterHeader) {
+          const parsed = parseInt(retryAfterHeader, 10);
+          if (!isNaN(parsed)) waitTimeSeconds = parsed;
+        }
+
+        const msg = `⏳ Rate limited (429). Figma requested wait of ${waitTimeSeconds}s (attempt ${attempt}/${maxRetries})...`;
         console.log(msg);
         onProgress?.(msg);
-        await sleep(waitTime);
+
+        await sleep(waitTimeSeconds * 1000);
         continue;
       }
 
